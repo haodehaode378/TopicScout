@@ -1,0 +1,1 @@
+"""TopicScout — personal research agent."""
