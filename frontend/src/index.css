@@ -648,7 +648,8 @@ input, textarea {
   flex-shrink: 0;
 }
 
-.config-field input {
+.config-field input,
+.config-field input[readonly] {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid var(--border);
@@ -661,6 +662,115 @@ input, textarea {
 
 .config-field input:focus {
   border-color: var(--accent);
+}
+
+.config-select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+.config-select:focus {
+  border-color: var(--accent);
+}
+
+/* Provider cards */
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.provider-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  background: var(--bg);
+}
+
+.provider-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.provider-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.provider-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.provider-card.selected .provider-icon {
+  background: var(--accent);
+  color: white;
+}
+
+.provider-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.provider-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.provider-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.provider-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.provider-detail {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
 /* Toast */

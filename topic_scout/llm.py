@@ -11,6 +11,9 @@ from .config import config
 
 logger = logging.getLogger(__name__)
 
+# Models that only accept temperature=1
+TEMPERATURE_LOCKED_MODELS = {"kimi-k2.5", "kimi-k2.6", "kimi-k2-thinking", "kimi-k2-thinking-turbo"}
+
 
 def _get_client() -> AsyncOpenAI:
     return AsyncOpenAI(
@@ -18,6 +21,13 @@ def _get_client() -> AsyncOpenAI:
         api_key=config.llm.api_key,
         timeout=config.llm.timeout,
     )
+
+
+def _effective_temperature(requested: Optional[float], model_name: str) -> float:
+    """Return temperature, forcing 1 for models that require it."""
+    if model_name in TEMPERATURE_LOCKED_MODELS:
+        return 1.0
+    return requested if requested is not None else config.llm.temperature
 
 
 async def chat_completion(
@@ -29,10 +39,11 @@ async def chat_completion(
 ) -> str:
     """Call the LLM with messages. Returns assistant reply text."""
     client = _get_client()
+    model_name = model or config.llm.model_name
     response = await client.chat.completions.create(
-        model=model or config.llm.model_name,
+        model=model_name,
         messages=messages,
-        temperature=temperature if temperature is not None else config.llm.temperature,
+        temperature=_effective_temperature(temperature, model_name),
         max_tokens=max_tokens or config.llm.max_tokens,
     )
     return response.choices[0].message.content or ""
@@ -42,12 +53,14 @@ async def test_connection() -> tuple[bool, str]:
     """Test if the LLM API is reachable. Returns (success, message)."""
     try:
         client = _get_client()
+        model_name = config.llm.model_name
         response = await client.chat.completions.create(
-            model=config.llm.model_name,
+            model=model_name,
             messages=[{"role": "user", "content": "Hi"}],
+            temperature=_effective_temperature(None, model_name),
             max_tokens=10,
         )
-        return True, f"Connected to {config.llm.model_name}"
+        return True, f"Connected to {model_name}"
     except Exception as e:
         return False, str(e)
 

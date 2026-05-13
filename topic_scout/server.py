@@ -709,7 +709,7 @@ async def get_config():
 async def update_config(req: UpdateConfigRequest):
     if req.llm:
         for k, v in req.llm.items():
-            if hasattr(config.llm, k) and k != "api_key":
+            if hasattr(config.llm, k):
                 setattr(config.llm, k, v)
     if req.crawl:
         for k, v in req.crawl.items():

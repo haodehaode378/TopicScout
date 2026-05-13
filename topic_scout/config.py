@@ -24,9 +24,9 @@ def _env_float(key: str, default: float) -> float:
 
 @dataclass
 class LLMConfig:
-    base_url: str = field(default_factory=lambda: _env("LLM_BASE_URL", "https://api.moonshot.cn/v1"))
+    base_url: str = field(default_factory=lambda: _env("LLM_BASE_URL", "https://api.deepseek.com"))
     api_key: str = field(default_factory=lambda: _env("LLM_API_KEY", ""))
-    model_name: str = field(default_factory=lambda: _env("LLM_MODEL_NAME", "mimo"))
+    model_name: str = field(default_factory=lambda: _env("LLM_MODEL_NAME", "deepseek-chat"))
     temperature: float = field(default_factory=lambda: _env_float("LLM_TEMPERATURE", 0.7))
     max_tokens: int = field(default_factory=lambda: _env_int("LLM_MAX_TOKENS", 4096))
     timeout: int = field(default_factory=lambda: _env_int("LLM_TIMEOUT", 60))
