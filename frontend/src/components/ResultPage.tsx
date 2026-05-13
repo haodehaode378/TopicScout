@@ -39,6 +39,11 @@ export default function ResultPage() {
         setSources(s.sources)
         setSummary(sum)
         setVersions(v)
+
+        // Auto-trigger crawl if topic just confirmed (status=crawling but no sources yet)
+        if (t.status === 'crawling' && s.sources.length === 0) {
+          triggerCrawl(id, []).catch(() => {})
+        }
       } catch (err) {
         toast(err instanceof Error ? err.message : '加载失败', 'error')
       } finally {

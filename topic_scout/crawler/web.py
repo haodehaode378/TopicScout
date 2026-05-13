@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from datetime import datetime
 from typing import Any, Optional
+from urllib.parse import urljoin
 
 import httpx
 
@@ -25,6 +27,34 @@ class WebCrawler(BaseCrawler):
     def can_handle(cls, url: str) -> bool:
         """Web crawler handles all URLs as fallback."""
         return True
+
+    @staticmethod
+    async def search_urls(keyword: str, max_results: int = 10) -> list[str]:
+        """Search for URLs using DuckDuckGo. Returns list of result URLs."""
+        import asyncio
+        from ddgs import DDGS
+
+        urls: list[str] = []
+        # Try google backend first, fall back to bing
+        for backend in ("google", "bing", "brave"):
+            try:
+                loop = asyncio.get_event_loop()
+                results = await loop.run_in_executor(
+                    None,
+                    lambda b=backend: DDGS().text(keyword, max_results=max_results, backend=b),
+                )
+                for r in results:
+                    url = r.get("href", "")
+                    if url.startswith("http"):
+                        urls.append(url)
+                if urls:
+                    break
+            except Exception as e:
+                logger.debug(f"[web] Search backend '{backend}' failed: {e}")
+                continue
+
+        logger.info(f"[web] Search '{keyword}' found {len(urls)} URLs")
+        return urls
 
     async def crawl_single(self, url: str, **kwargs: Any) -> Optional[Source]:
         """Crawl a single web page. Uses httpx for async fetching."""

@@ -325,13 +325,14 @@ async def _run_crawl(
         sources_found = 0
         total = len(urls) if urls else 0
 
-        # If no URLs provided, use keyword-based search on available platforms
+        # If no URLs provided, search for real URLs using keyword
         if not urls:
             topic = await db.get_topic(topic_id)
-            keyword = topic.keyword if topic else ""
-            urls = []
+            keyword = topic.title or topic.keyword if topic else ""
+            search_q = keyword
             if "web" in platforms:
-                urls.append(f"https://www.google.com/search?q={keyword}")
+                found = await WebCrawler.search_urls(search_q, max_results=config.crawl.max_items_per_source)
+                urls.extend(found)
             total = len(urls) if urls else 0
 
         # Build crawlers map
