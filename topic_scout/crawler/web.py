@@ -1,14 +1,15 @@
-"""General web crawler using Crawl4AI."""
+"""General web crawler — search + content extraction for Chinese web."""
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
 import re
 from datetime import datetime
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -18,6 +19,24 @@ from ..models import Platform, Source
 from .base import BaseCrawler
 
 logger = logging.getLogger(__name__)
+
+# Domains to skip in search results
+BLOCKED_DOMAINS = {
+    "google.com", "github.com", "vk.com", "youtube.com",
+    "duckduckgo.com", "bing.com", "yandex.com",
+    "lazada.com.my", "lazada.sg", "pchome.com.tw",
+    "huishou.jd.com", "meigen.ai", "facebook.com",
+    "twitter.com", "instagram.com", "tiktok.com",
+}
+
+
+def _is_blocked(url: str) -> bool:
+    """Check if URL belongs to a blocked domain."""
+    try:
+        domain = urlparse(url).netloc.lower()
+        return any(domain.endswith(b) for b in BLOCKED_DOMAINS)
+    except Exception:
+        return False
 
 
 class WebCrawler(BaseCrawler):
@@ -30,34 +49,31 @@ class WebCrawler(BaseCrawler):
 
     @staticmethod
     async def search_urls(keyword: str, max_results: int = 10) -> list[str]:
-        """Search for URLs using DuckDuckGo. Returns list of result URLs."""
-        import asyncio
+        """Search for URLs using DuckDuckGo. Returns filtered result URLs."""
         from ddgs import DDGS
 
         urls: list[str] = []
-        # Try google backend first, fall back to bing
-        for backend in ("google", "bing", "brave"):
-            try:
-                loop = asyncio.get_event_loop()
-                results = await loop.run_in_executor(
-                    None,
-                    lambda b=backend: DDGS().text(keyword, max_results=max_results, backend=b),
-                )
-                for r in results:
-                    url = r.get("href", "")
-                    if url.startswith("http"):
-                        urls.append(url)
-                if urls:
-                    break
-            except Exception as e:
-                logger.debug(f"[web] Search backend '{backend}' failed: {e}")
-                continue
+        try:
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: DDGS().text(keyword, max_results=max_results),
+            )
+            for r in results:
+                url = r.get("href", "")
+                if url.startswith("http") and not _is_blocked(url):
+                    urls.append(url)
+        except Exception as e:
+            logger.warning(f"[web] Search failed for '{keyword}': {e}")
 
         logger.info(f"[web] Search '{keyword}' found {len(urls)} URLs")
         return urls
 
     async def crawl_single(self, url: str, **kwargs: Any) -> Optional[Source]:
         """Crawl a single web page. Uses httpx for async fetching."""
+        if _is_blocked(url):
+            return None
+
         topic_id = kwargs.get("topic_id", "")
         version = kwargs.get("version", 1)
 

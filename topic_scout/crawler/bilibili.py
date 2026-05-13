@@ -5,6 +5,7 @@ Reference: SocialSisterYi/bilibili-API-collect
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from datetime import datetime
@@ -21,6 +22,38 @@ from .base import BaseCrawler
 class BilibiliCrawler(BaseCrawler):
     platform = Platform.BILIBILI
     _domains = ["bilibili.com", "b23.tv", "bili"]
+
+    @staticmethod
+    async def search_urls(keyword: str, max_results: int = 10) -> list[str]:
+        """Search Bilibili for videos by keyword. Returns list of video URLs."""
+        urls: list[str] = []
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://api.bilibili.com/x/web-interface/search/all/v2",
+                    params={"keyword": keyword, "page": 1, "pagesize": max_results},
+                    headers={"User-Agent": "Mozilla/5.0", "Referer": "https://www.bilibili.com"},
+                )
+                data = resp.json()
+                if data.get("code") != 0:
+                    return urls
+                for result in data.get("data", {}).get("result", []):
+                    if result.get("result_type") == "video":
+                        for v in result.get("data", []):
+                            bvid = v.get("bvid", "")
+                            if bvid:
+                                urls.append(f"https://www.bilibili.com/video/{bvid}")
+                                if len(urls) >= max_results:
+                                    break
+                    if len(urls) >= max_results:
+                        break
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[bilibili] Search failed for '{keyword}': {e}")
+
+        import logging
+        logging.getLogger(__name__).info(f"[bilibili] Search '{keyword}' found {len(urls)} URLs")
+        return urls
 
     async def crawl_single(self, url: str, **kwargs: Any) -> Optional[Source]:
         topic_id = kwargs.get("topic_id", "")

@@ -50,7 +50,7 @@ export const confirmTopic = (topicId: string, title?: string, description?: stri
   })
 
 // Crawl
-export const triggerCrawl = (topicId: string, urls: string[], platforms: string[] = ['web']) =>
+export const triggerCrawl = (topicId: string, urls: string[], platforms: string[] = ['web', 'bilibili']) =>
   request<{ task_id: string; version: number }>(`/topics/${topicId}/crawl`, {
     method: 'POST',
     body: JSON.stringify({ urls, platforms }),

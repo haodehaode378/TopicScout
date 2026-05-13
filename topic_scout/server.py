@@ -91,7 +91,7 @@ class ConfirmRequest(BaseModel):
 
 
 class CrawlRequest(BaseModel):
-    platforms: list[str] = ["web"]
+    platforms: list[str] = ["web", "bilibili"]
     urls: list[str] = []
 
 
@@ -319,21 +319,12 @@ async def _run_crawl(
     urls: list[str],
 ) -> None:
     """Background crawl task with multi-platform support."""
+    logger.info(f"[crawl] START: topic={topic_id}, platforms={platforms}, urls={len(urls)}")
     try:
         await db.update_task(task_id, status=TaskStatus.RUNNING, detail="正在爬取...")
 
         sources_found = 0
         total = len(urls) if urls else 0
-
-        # If no URLs provided, search for real URLs using keyword
-        if not urls:
-            topic = await db.get_topic(topic_id)
-            keyword = topic.title or topic.keyword if topic else ""
-            search_q = keyword
-            if "web" in platforms:
-                found = await WebCrawler.search_urls(search_q, max_results=config.crawl.max_items_per_source)
-                urls.extend(found)
-            total = len(urls) if urls else 0
 
         # Build crawlers map
         crawler_map: dict[str, type] = {
@@ -345,18 +336,45 @@ async def _run_crawl(
             "xiaohongshu": XiaohongshuCrawler,
         }
 
-        # Distribute URLs to platform crawlers
         platform_urls: dict[str, list[str]] = {p: [] for p in platforms}
-        for url in urls:
-            assigned = False
-            for p in platforms:
-                crawler_cls = crawler_map.get(p)
-                if crawler_cls and crawler_cls.can_handle(url):
-                    platform_urls[p].append(url)
-                    assigned = True
-                    break
-            if not assigned:
-                platform_urls.setdefault("web", []).append(url)
+
+        # If no URLs provided, search across platforms
+        if not urls:
+            topic = await db.get_topic(topic_id)
+            search_q = (topic.title if topic else "") or (topic.keyword if topic else "")
+            per_platform = max(5, config.crawl.max_items_per_source // max(len(platforms), 1))
+            logger.info(f"[crawl] SEARCH: platforms={platforms}, q={search_q[:50]}, per={per_platform}")
+
+            # Search each platform in parallel
+            search_tasks = {}
+            if "bilibili" in platforms:
+                search_tasks["bilibili"] = BilibiliCrawler.search_urls(search_q, max_results=per_platform)
+            if "web" in platforms:
+                search_tasks["web"] = WebCrawler.search_urls(f"{search_q} 最新", max_results=per_platform)
+
+            results = await asyncio.gather(*search_tasks.values(), return_exceptions=True)
+            for platform_name, result in zip(search_tasks.keys(), results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Search failed for {platform_name}: {result}")
+                    continue
+                logger.info(f"[search] {platform_name}: found {len(result)} URLs")
+                platform_urls[platform_name].extend(result)
+                urls.extend(result)
+                logger.info(f"[crawl] RESULT: {platform_name} -> {len(result)} URLs")
+
+            total = len(urls) if urls else 0
+        else:
+            # Distribute provided URLs to platform crawlers
+            for url in urls:
+                assigned = False
+                for p in platforms:
+                    crawler_cls = crawler_map.get(p)
+                    if crawler_cls and crawler_cls.can_handle(url):
+                        platform_urls[p].append(url)
+                        assigned = True
+                        break
+                if not assigned:
+                    platform_urls.setdefault("web", []).append(url)
 
         # Crawl each platform
         for platform_name in platforms:
@@ -426,6 +444,7 @@ async def _run_crawl(
         await db.update_task(task_id, status=TaskStatus.ERROR, error_msg="用户取消")
         await _push_sse(topic_id, {"type": "cancelled"})
     except Exception as e:
+        logger.error(f"[crawl] ERROR: {type(e).__name__}: {e}")
         logger.exception(f"Crawl failed for {topic_id}")
         await db.update_task(task_id, status=TaskStatus.ERROR, error_msg=str(e))
         await db.update_topic(topic_id, status=TopicStatus.ERROR)
