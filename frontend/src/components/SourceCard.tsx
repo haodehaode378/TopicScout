@@ -151,7 +151,7 @@ export default function SourceCard({ source, expanded, onToggle, onUpdate, delay
             {source.summary && (
               <div style={{ marginBottom: 16 }}>
                 <h4 style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>AI 总结</h4>
-                <p style={{ fontSize: 14, color: 'var(--text)' }}>{source.summary}</p>
+                <div style={{ fontSize: 14, color: 'var(--text)' }}><ReactMarkdown>{source.summary}</ReactMarkdown></div>
               </div>
             )}
             <div className="content markdown-body">

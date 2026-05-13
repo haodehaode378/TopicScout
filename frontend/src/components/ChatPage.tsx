@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
 import { getChatHistory, sendChat, confirmTopic, getTopic, rollbackChat } from '../lib/api'
 import type { ChatMessage, Topic } from '../lib/types'
 import { useToast } from './Toast'
@@ -140,7 +141,11 @@ export default function ChatPage() {
                   onDoubleClick={() => msg.role === 'user' ? handleRollback(msg.id) : startEdit(msg)}
                   title={msg.role === 'user' ? '双击回退到此消息' : '双击编辑'}
                 >
-                  {msg.content}
+                  {msg.role === 'assistant' ? (
+                    <ReactMarkdown>{msg.content.replace(/\[READY\].*/s, '').trim()}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               )}
             </motion.div>

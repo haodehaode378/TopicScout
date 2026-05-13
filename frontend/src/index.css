@@ -335,6 +335,91 @@ input, textarea {
   border: 1px solid var(--border);
 }
 
+/* Markdown in chat */
+.chat-message.assistant h1,
+.chat-message.assistant h2,
+.chat-message.assistant h3 {
+  margin: 12px 0 8px;
+  font-weight: 600;
+}
+.chat-message.assistant h1 { font-size: 18px; }
+.chat-message.assistant h2 { font-size: 16px; }
+.chat-message.assistant h3 { font-size: 15px; }
+
+.chat-message.assistant p {
+  margin: 6px 0;
+}
+
+.chat-message.assistant ul,
+.chat-message.assistant ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.chat-message.assistant li {
+  margin: 3px 0;
+}
+
+.chat-message.assistant code {
+  background: var(--bg-hover);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.chat-message.assistant pre {
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.chat-message.assistant pre code {
+  background: none;
+  padding: 0;
+}
+
+.chat-message.assistant blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: var(--text-secondary);
+}
+
+.chat-message.assistant strong {
+  font-weight: 600;
+}
+
+.chat-message.assistant a {
+  color: var(--accent);
+}
+
+.chat-message.assistant hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+.chat-message.assistant table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.chat-message.assistant th,
+.chat-message.assistant td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.chat-message.assistant th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
 .chat-input {
   display: flex;
   gap: 8px;
@@ -529,6 +614,21 @@ input, textarea {
   line-height: 1.8;
   color: var(--text);
 }
+
+.markdown-body h1 { font-size: 20px; margin: 16px 0 8px; font-weight: 700; }
+.markdown-body h2 { font-size: 17px; margin: 14px 0 6px; font-weight: 600; }
+.markdown-body h3 { font-size: 15px; margin: 12px 0 4px; font-weight: 600; }
+.markdown-body p { margin: 6px 0; }
+.markdown-body ul, .markdown-body ol { padding-left: 20px; margin: 6px 0; }
+.markdown-body li { margin: 3px 0; }
+.markdown-body code { background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-size: 13px; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+.markdown-body pre { background: var(--bg-hover); border-radius: var(--radius); padding: 12px; margin: 8px 0; overflow-x: auto; }
+.markdown-body pre code { background: none; padding: 0; }
+.markdown-body blockquote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 8px 0; color: var(--text-secondary); }
+.markdown-body a { color: var(--accent); }
+.markdown-body table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.markdown-body th { background: var(--bg-hover); font-weight: 600; }
 
 .source-detail .images {
   display: flex;

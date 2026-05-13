@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   getTopic, getCrawlSources, getSummary, getVersions,
@@ -202,7 +203,7 @@ export default function ResultPage() {
             animate={{ opacity: 1, y: 0 }}
           >
             <h3>全局总结</h3>
-            <div className="summary-text">{summary.content}</div>
+            <div className="summary-text"><ReactMarkdown>{summary.content}</ReactMarkdown></div>
             {summary.key_insights.length > 0 && (
               <>
                 <h3>关键洞察</h3>
