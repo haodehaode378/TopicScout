@@ -45,8 +45,9 @@ class BaseCrawler(ABC):
                         self.crawl_single(url, **kwargs),
                         timeout=config.crawl.request_timeout,
                     )
-                    await asyncio.sleep(config.crawl.request_interval)
-                    return result
+                # Rate limit outside semaphore so concurrency slots stay available
+                await asyncio.sleep(config.crawl.request_interval)
+                return result
             except asyncio.TimeoutError:
                 last_error = TimeoutError(f"Timeout after {config.crawl.request_timeout}s")
                 logger.warning(f"[{self.platform.value}] Timeout on {url} (attempt {attempt + 1})")

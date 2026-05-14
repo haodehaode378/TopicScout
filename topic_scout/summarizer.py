@@ -36,9 +36,7 @@ CATEGORY_SYSTEM = """你是一个信息分类专家。给你一批资料，请�
 3. 类别数量控制在 3-8 个
 4. 如果某条资料确实不属于任何类别，归入"其他"
 
-输出格式（每行一个）：
-类别名: 来源ID1, 来源ID2, 来源ID3
-类别名: 来源ID4, 来源ID5"""
+直接输出分类结果，不要输出任何解释、规则或格式说明。每行一个分类，格式为"类别名: ID1, ID2"。"""
 
 
 def _parse_summary_response(text: str) -> tuple[str, list[str], str]:
@@ -85,6 +83,8 @@ def _parse_summary_response(text: str) -> tuple[str, list[str], str]:
 
 def _parse_categories(text: str) -> dict[str, list[str]]:
     """Parse categorization output. Returns {category: [source_ids]}."""
+    import re
+
     result: dict[str, list[str]] = {}
     for line in text.strip().split("\n"):
         line = line.strip()
@@ -93,6 +93,16 @@ def _parse_categories(text: str) -> dict[str, list[str]]:
         parts = line.split(":", 1)
         category = parts[0].strip()
         ids = [s.strip() for s in parts[1].split(",") if s.strip()]
+        # Skip lines that look like prompt instructions, not real categories
+        # Valid categories: short Chinese names (2-6 chars)
+        if len(category) > 10:
+            continue
+        if re.search(r'[a-zA-Z]', category):
+            continue
+        if any(kw in category for kw in ("规则", "格式", "输出", "类别名", "要求", "示例")):
+            continue
+        # Validate source IDs look like src_xxx
+        ids = [s for s in ids if re.match(r'^src_', s)]
         if category and ids:
             result[category] = ids
     return result
@@ -153,6 +163,10 @@ async def categorize_sources(sources: list[Source]) -> dict[str, list[str]]:
         return {"其他": [s.id for s in sources]}
 
     categories = _parse_categories(response)
+
+    # Fallback: if nothing parsed, put all in 其他
+    if not categories:
+        return {"其他": [s.id for s in sources]}
 
     # Cap at 9 + 其他
     if len(categories) > 10:

@@ -1,0 +1,24 @@
+{
+  "create_topic": {
+    "topic_id": "topic_20260514_be810b",
+    "ai_reply": "你想聚焦在哪些类型的开源AI项目上？比如：\n- 基础大模型（类似Llama、Qwen这类）\n- 开发工具链（框架、部署工具、评估平台）\n- 垂直应用（代码生成、多模态、AI Agent）\n\n另外，你更",
+    "is_ready": false
+  },
+  "confirm": {
+    "title": "2026年最值得关注的开源AI项目",
+    "description": "2026年最值得关注的开源AI项目"
+  },
+  "crawl_task": {
+    "task_id": "task_36a920b5",
+    "version": 1
+  },
+  "crawl": {
+    "status": "done",
+    "total_sources": 10
+  },
+  "summary": null,
+  "final": {
+    "status": "done",
+    "categories": []
+  }
+}

@@ -21,41 +21,40 @@ class WechatCrawler(BaseCrawler):
 
     @staticmethod
     async def search_urls(keyword: str, max_results: int = 10) -> list[str]:
-        """Fetch article URLs from subscribed WeChat accounts.
-        Unlike other platforms, WeChat doesn't support keyword search directly.
-        Instead, we iterate subscribed accounts and get their latest articles.
-        """
-        from .. import db
+        """Search WeChat public accounts by keyword, then fetch their articles."""
+        from ..wx_api import search_biz
 
         urls: list[str] = []
-        accounts: list = []
         try:
-            accounts = await db.list_wx_accounts()
+            accounts = await search_biz(keyword, limit=5)
             if not accounts:
-                logger.info("[wechat] No subscribed accounts, skipping search")
+                logger.info("[wechat] No accounts found for keyword, skipping")
                 return []
 
             per_account = max(1, max_results // max(len(accounts), 1))
             for acct in accounts:
                 try:
-                    articles = await get_article_list(acct.id, page=0, count=per_account)
+                    fakeid = acct.get("fakeid", "")
+                    nickname = acct.get("nickname", "")
+                    if not fakeid:
+                        continue
+                    articles = await get_article_list(fakeid, page=0, count=per_account)
                     for a in articles:
                         if a.get("link") and a["link"].startswith("http"):
                             urls.append(a["link"])
                         if len(urls) >= max_results:
                             break
                 except ValueError:
-                    # token expired — stop entirely
                     logger.warning("[wechat] Token expired during article fetch")
                     return urls
                 except Exception as e:
-                    logger.warning(f"[wechat] Failed to fetch articles for {acct.nickname}: {e}")
+                    logger.warning(f"[wechat] Failed to fetch articles for {nickname}: {e}")
                 if len(urls) >= max_results:
                     break
         except Exception as e:
             logger.warning(f"[wechat] Search failed: {e}")
 
-        logger.info(f"[wechat] Found {len(urls)} article URLs from {len(accounts)} accounts")
+        logger.info(f"[wechat] Found {len(urls)} article URLs")
         return urls
 
     @classmethod

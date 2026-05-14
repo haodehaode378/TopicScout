@@ -36,8 +36,8 @@ class LLMConfig:
 class CrawlConfig:
     max_depth: int = field(default_factory=lambda: _env_int("CRAWL_MAX_DEPTH", 5))
     max_items_per_source: int = field(default_factory=lambda: _env_int("CRAWL_MAX_ITEMS", 200))
-    request_interval: float = field(default_factory=lambda: _env_float("CRAWL_INTERVAL", 2.0))
-    request_timeout: int = field(default_factory=lambda: _env_int("CRAWL_TIMEOUT", 30))
+    request_interval: float = field(default_factory=lambda: _env_float("CRAWL_INTERVAL", 1.0))
+    request_timeout: int = field(default_factory=lambda: _env_int("CRAWL_TIMEOUT", 15))
     max_concurrent: int = field(default_factory=lambda: _env_int("CRAWL_MAX_CONCURRENT", 10))
     max_retry: int = field(default_factory=lambda: _env_int("CRAWL_MAX_RETRY", 3))
     retry_backoff: float = 2.0

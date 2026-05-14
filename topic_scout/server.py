@@ -18,6 +18,7 @@ from sse_starlette.sse import EventSourceResponse
 from . import db
 from .chat import auto_confirm, process_chat
 from .config import config
+from .crawler.base import BaseCrawler
 from .crawler.bilibili import BilibiliCrawler
 from .crawler.douyin import DouyinCrawler
 from .crawler.weibo import WeiboCrawler
@@ -400,45 +401,56 @@ async def _run_crawl(
                 if not assigned:
                     platform_urls.setdefault("web", []).append(url)
 
-        # Crawl each platform
+        # Crawl each platform concurrently
+        urls_completed = 0
+        urls_lock = asyncio.Lock()
+
+        async def _crawl_one(platform_name: str, url: str, crawler: BaseCrawler) -> None:
+            nonlocal urls_completed, sources_found
+            try:
+                source = await crawler.crawl_with_retry(
+                    url, topic_id=topic_id, version=version
+                )
+                if source:
+                    if not await db.source_exists(topic_id, url):
+                        await db.add_source(source)
+                        sources_found += 1
+                        await _push_sse(topic_id, {
+                            "type": "source",
+                            "source": source_to_dict(source),
+                            "progress": min(int(urls_completed / max(total, 1) * 100), 99),
+                            "detail": f"已爬取 {platform_name}",
+                        })
+                    else:
+                        logger.info(f"Duplicate URL skipped: {url}")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"Failed to crawl {url}: {e}")
+                await _push_sse(topic_id, {
+                    "type": "error",
+                    "url": url,
+                    "error": str(e),
+                })
+            finally:
+                async with urls_lock:
+                    urls_completed += 1
+                    progress = int(urls_completed / max(total, 1) * 100)
+                await db.update_task(task_id, progress=min(progress, 99), detail=f"正在爬取 {urls_completed}/{total}")
+
+        # Gather all crawl tasks across platforms
+        all_tasks: list[asyncio.Task] = []
         for platform_name in platforms:
             p_urls = platform_urls.get(platform_name, [])
             if not p_urls:
                 continue
-
             crawler_cls = crawler_map.get(platform_name, WebCrawler)
             crawler = crawler_cls()
+            for url in p_urls:
+                all_tasks.append(asyncio.create_task(_crawl_one(platform_name, url, crawler)))
 
-            for i, url in enumerate(p_urls):
-                try:
-                    source = await crawler.crawl_with_retry(
-                        url, topic_id=topic_id, version=version
-                    )
-                    if source:
-                        if not await db.source_exists(topic_id, url):
-                            await db.add_source(source)
-                            sources_found += 1
-                            progress = int((sources_found) / max(total, 1) * 100)
-                            await _push_sse(topic_id, {
-                                "type": "source",
-                                "source": source_to_dict(source),
-                                "progress": min(progress, 99),
-                                "detail": f"已爬取 {platform_name} {i + 1}/{len(p_urls)}",
-                            })
-                        else:
-                            logger.info(f"Duplicate URL skipped: {url}")
-                except asyncio.CancelledError:
-                    raise
-                except Exception as e:
-                    logger.warning(f"Failed to crawl {url}: {e}")
-                    await _push_sse(topic_id, {
-                        "type": "error",
-                        "url": url,
-                        "error": str(e),
-                    })
-
-                progress = int((sources_found) / max(total, 1) * 100)
-                await db.update_task(task_id, progress=min(progress, 99), detail=f"正在爬取 {platform_name} {i + 1}/{len(p_urls)}")
+        if all_tasks:
+            await asyncio.gather(*all_tasks, return_exceptions=True)
 
         # Update crawl version
         from datetime import datetime as dt

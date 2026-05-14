@@ -112,19 +112,3 @@ export interface WxLoginStatus {
   error: string
   qr_exists: boolean
 }
-
-export interface WxSearchResult {
-  fakeid: string
-  nickname: string
-  alias: string
-  round_head_img: string
-}
-
-export interface WxAccount {
-  id: string
-  nickname: string
-  alias: string
-  avatar_url: string
-  subscribed_at: string
-  last_crawl_at: string
-}
