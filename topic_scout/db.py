@@ -20,6 +20,7 @@ from .models import (
     TaskType,
     Topic,
     TopicStatus,
+    WxAccount,
 )
 
 SCHEMA = """
@@ -90,6 +91,16 @@ CREATE TABLE IF NOT EXISTS summaries (
     key_insights TEXT DEFAULT '[]',
     reliability TEXT DEFAULT '',
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wx_accounts (
+    id TEXT PRIMARY KEY,
+    nickname TEXT DEFAULT '',
+    alias TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
+    subscribed_at TEXT NOT NULL,
+    last_crawl_at TEXT DEFAULT '',
+    status TEXT DEFAULT 'active'
 );
 """
 
@@ -436,7 +447,7 @@ async def get_summary(topic_id: str, version: Optional[int] = None) -> Optional[
         if version is not None:
             cursor = await db.execute("SELECT * FROM summaries WHERE topic_id = ? AND crawl_version = ?", (topic_id, version))
         else:
-            cursor = await db.execute("SELECT * FROM summaries WHERE topic_id = ? ORDER BY crawl_version DESC LIMIT 1", (topic_id,))
+            cursor = await db.execute("SELECT * FROM summaries WHERE topic_id = ? ORDER BY crawl_version DESC, id DESC LIMIT 1", (topic_id,))
         row = await cursor.fetchone()
         if not row:
             return None
@@ -444,5 +455,68 @@ async def get_summary(topic_id: str, version: Optional[int] = None) -> Optional[
             id=row[0], topic_id=row[1], crawl_version=row[2], content=row[3],
             key_insights=json.loads(row[4]), reliability=row[5], created_at=row[6],
         )
+    finally:
+        await db.close()
+
+
+# --- WeChat Accounts ---
+
+async def add_wx_account(acct: WxAccount) -> WxAccount:
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT OR REPLACE INTO wx_accounts (id, nickname, alias, avatar_url, subscribed_at, last_crawl_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (acct.id, acct.nickname, acct.alias, acct.avatar_url, acct.subscribed_at, acct.last_crawl_at, acct.status),
+        )
+        await db.commit()
+        return acct
+    finally:
+        await db.close()
+
+
+async def list_wx_accounts() -> list[WxAccount]:
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM wx_accounts WHERE status = 'active' ORDER BY subscribed_at DESC")
+        rows = await cursor.fetchall()
+        return [
+            WxAccount(id=r[0], nickname=r[1], alias=r[2], avatar_url=r[3],
+                      subscribed_at=r[4], last_crawl_at=r[5], status=r[6])
+            for r in rows
+        ]
+    finally:
+        await db.close()
+
+
+async def get_wx_account(fakeid: str) -> Optional[WxAccount]:
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM wx_accounts WHERE id = ?", (fakeid,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        return WxAccount(id=row[0], nickname=row[1], alias=row[2], avatar_url=row[3],
+                         subscribed_at=row[4], last_crawl_at=row[5], status=row[6])
+    finally:
+        await db.close()
+
+
+async def delete_wx_account(fakeid: str) -> None:
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM wx_accounts WHERE id = ?", (fakeid,))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def update_wx_account(fakeid: str, **kwargs: object) -> None:
+    sets = ", ".join(f"{k} = ?" for k in kwargs)
+    vals = list(kwargs.values())
+    vals.append(fakeid)
+    db = await get_db()
+    try:
+        await db.execute(f"UPDATE wx_accounts SET {sets} WHERE id = ?", vals)
+        await db.commit()
     finally:
         await db.close()

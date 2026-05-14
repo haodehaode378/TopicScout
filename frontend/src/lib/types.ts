@@ -22,7 +22,7 @@ export interface ChatMessage {
   created_at: string
 }
 
-export type Platform = 'web' | 'bilibili' | 'douyin' | 'weibo' | 'zhihu' | 'xiaohongshu'
+export type Platform = 'web' | 'bilibili' | 'douyin' | 'weibo' | 'zhihu' | 'xiaohongshu' | 'wechat'
 
 export interface Source {
   id: string
@@ -103,4 +103,28 @@ export interface AppConfig {
     theme: string
     items_per_page: number
   }
+}
+
+// WeChat MP
+export interface WxLoginStatus {
+  status: 'idle' | 'loading' | 'qr_ready' | 'success' | 'error'
+  logged_in: boolean
+  error: string
+  qr_exists: boolean
+}
+
+export interface WxSearchResult {
+  fakeid: string
+  nickname: string
+  alias: string
+  round_head_img: string
+}
+
+export interface WxAccount {
+  id: string
+  nickname: string
+  alias: string
+  avatar_url: string
+  subscribed_at: string
+  last_crawl_at: string
 }

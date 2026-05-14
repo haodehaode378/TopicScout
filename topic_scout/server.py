@@ -24,6 +24,7 @@ from .crawler.weibo import WeiboCrawler
 from .crawler.web import WebCrawler
 from .crawler.xiaohongshu import XiaohongshuCrawler
 from .crawler.zhihu import ZhihuCrawler
+from .crawler.wechat import WechatCrawler
 from .exporter import export_json
 from .llm import test_connection
 from .models import (
@@ -42,6 +43,10 @@ from .models import (
     topic_to_dict,
 )
 from .summarizer import categorize_sources, generate_summary
+from .wx_auth import QR_IMAGE_PATH, get_status as wx_get_status, start_login as wx_start_login, stop_login as wx_stop_login
+from .wx_token import clear_credentials, is_logged_in
+from .wx_api import search_biz, get_article_list
+from .models import WxAccount
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +120,18 @@ class UpdateConfigRequest(BaseModel):
     crawl: Optional[dict] = None
     storage: Optional[dict] = None
     frontend: Optional[dict] = None
+
+
+class WxSearchRequest(BaseModel):
+    keyword: str
+    limit: int = 10
+
+
+class WxSubscribeRequest(BaseModel):
+    fakeid: str
+    nickname: str = ""
+    alias: str = ""
+    avatar_url: str = ""
 
 
 # --- Topics ---
@@ -334,6 +351,7 @@ async def _run_crawl(
             "weibo": WeiboCrawler,
             "zhihu": ZhihuCrawler,
             "xiaohongshu": XiaohongshuCrawler,
+            "wechat": WechatCrawler,
         }
 
         platform_urls: dict[str, list[str]] = {p: [] for p in platforms}
@@ -349,6 +367,12 @@ async def _run_crawl(
             search_tasks = {}
             if "bilibili" in platforms:
                 search_tasks["bilibili"] = BilibiliCrawler.search_urls(search_q, max_results=per_platform)
+            if "douyin" in platforms:
+                search_tasks["douyin"] = DouyinCrawler.search_urls(search_q, max_results=per_platform)
+            if "xiaohongshu" in platforms:
+                search_tasks["xiaohongshu"] = XiaohongshuCrawler.search_urls(search_q, max_results=per_platform)
+            if "wechat" in platforms:
+                search_tasks["wechat"] = WechatCrawler.search_urls(search_q, max_results=per_platform)
             if "web" in platforms:
                 search_tasks["web"] = WebCrawler.search_urls(f"{search_q} 最新", max_results=per_platform)
 
@@ -686,6 +710,75 @@ async def retry_task(task_id: str):
     elif task.type == TaskType.SUMMARIZE:
         await db.update_task(task_id, status=TaskStatus.RUNNING, progress=0, error_msg="", retry_count=task.retry_count + 1)
         asyncio.create_task(_run_summarize(task.topic_id, task_id))
+    return {"ok": True}
+
+
+# --- WeChat MP ---
+
+@app.post("/api/wx/login")
+async def wx_login():
+    if is_logged_in():
+        return {"status": "success", "message": "已登录"}
+    result = wx_start_login()
+    return result
+
+
+@app.get("/api/wx/status")
+async def wx_login_status():
+    if is_logged_in():
+        return {"status": "success", "logged_in": True, "qr_exists": False, "error": ""}
+    return wx_get_status()
+
+
+@app.get("/api/wx/qrcode")
+async def wx_qrcode():
+    import os
+    if os.path.exists(QR_IMAGE_PATH):
+        return FileResponse(QR_IMAGE_PATH, media_type="image/png")
+    raise HTTPException(404, "QR code not ready")
+
+
+@app.post("/api/wx/logout")
+async def wx_logout():
+    wx_stop_login()
+    clear_credentials()
+    return {"ok": True}
+
+
+@app.post("/api/wx/search")
+async def wx_search_accounts(req: WxSearchRequest):
+    try:
+        results = await search_biz(req.keyword, limit=req.limit)
+        return {"accounts": results}
+    except ValueError as e:
+        raise HTTPException(401, str(e))
+
+
+@app.post("/api/wx/subscribe")
+async def wx_subscribe(req: WxSubscribeRequest):
+    acct = WxAccount(
+        id=req.fakeid,
+        nickname=req.nickname,
+        alias=req.alias,
+        avatar_url=req.avatar_url,
+    )
+    await db.add_wx_account(acct)
+    return {"ok": True}
+
+
+@app.get("/api/wx/accounts")
+async def wx_list_accounts():
+    accounts = await db.list_wx_accounts()
+    return [
+        {"id": a.id, "nickname": a.nickname, "alias": a.alias, "avatar_url": a.avatar_url,
+         "subscribed_at": a.subscribed_at, "last_crawl_at": a.last_crawl_at}
+        for a in accounts
+    ]
+
+
+@app.delete("/api/wx/accounts/{fakeid}")
+async def wx_unsubscribe(fakeid: str):
+    await db.delete_wx_account(fakeid)
     return {"ok": True}
 
 

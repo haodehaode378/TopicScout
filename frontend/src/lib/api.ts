@@ -1,6 +1,6 @@
 /** Backend API client. */
 
-import type { Topic, ChatMessage, Source, CrawlVersion, Summary, TaskItem, AppConfig } from './types'
+import type { Topic, ChatMessage, Source, CrawlVersion, Summary, TaskItem, AppConfig, WxLoginStatus, WxSearchResult, WxAccount } from './types'
 
 const BASE = '/api'
 
@@ -151,3 +151,27 @@ export function createCrawlSSE(topicId: string, onMessage: (data: unknown) => vo
   }
   return es
 }
+
+// WeChat MP
+export const wxLogin = () => request<{ status: string; qr_url?: string }>('/wx/login', { method: 'POST' })
+
+export const wxLoginStatus = () => request<WxLoginStatus>('/wx/status')
+
+export const wxLogout = () => request<{ ok: boolean }>('/wx/logout', { method: 'POST' })
+
+export const wxSearch = (keyword: string, limit = 10) =>
+  request<{ accounts: WxSearchResult[] }>('/wx/search', {
+    method: 'POST',
+    body: JSON.stringify({ keyword, limit }),
+  })
+
+export const wxSubscribe = (account: { fakeid: string; nickname?: string; alias?: string; avatar_url?: string }) =>
+  request<{ ok: boolean }>('/wx/subscribe', {
+    method: 'POST',
+    body: JSON.stringify(account),
+  })
+
+export const wxAccounts = () => request<WxAccount[]>('/wx/accounts')
+
+export const wxUnsubscribe = (fakeid: string) =>
+  request<{ ok: boolean }>(`/wx/accounts/${fakeid}`, { method: 'DELETE' })

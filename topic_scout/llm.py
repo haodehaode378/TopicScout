@@ -46,7 +46,8 @@ async def chat_completion(
         temperature=_effective_temperature(temperature, model_name),
         max_tokens=max_tokens or config.llm.max_tokens,
     )
-    return response.choices[0].message.content or ""
+    msg = response.choices[0].message
+    return msg.content or msg.reasoning_content or ""
 
 
 async def test_connection() -> tuple[bool, str]:

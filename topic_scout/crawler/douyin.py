@@ -5,6 +5,7 @@ Reference: NanmiCoder/MediaCrawler, JoeanAmier/TikTokDownloader
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from datetime import datetime
@@ -21,6 +22,32 @@ from .base import BaseCrawler
 class DouyinCrawler(BaseCrawler):
     platform = Platform.DOUYIN
     _domains = ["douyin.com", "iesdouyin.com"]
+
+    @staticmethod
+    async def search_urls(keyword: str, max_results: int = 10) -> list[str]:
+        """Search Douyin via DuckDuckGo site: filter."""
+        from ddgs import DDGS
+        import logging
+        logger = logging.getLogger(__name__)
+        urls: list[str] = []
+        try:
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: DDGS().text(f"site:douyin.com {keyword}", max_results=max_results),
+            )
+            for r in results:
+                url = r.get("href", "")
+                if url.startswith("http"):
+                    urls.append(url)
+        except Exception as e:
+            logger.warning(f"[douyin] Search failed: {e}")
+        logger.info(f"[douyin] Search '{keyword}' found {len(urls)} URLs")
+        return urls
+
+    @classmethod
+    def can_handle(cls, url: str) -> bool:
+        return any(d in url for d in cls._domains)
 
     async def crawl_single(self, url: str, **kwargs: Any) -> Optional[Source]:
         topic_id = kwargs.get("topic_id", "")

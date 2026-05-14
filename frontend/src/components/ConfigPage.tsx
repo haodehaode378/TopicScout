@@ -1,8 +1,8 @@
 /** Config page — LLM / crawl / storage settings with provider cards. */
 
 import { useState, useEffect } from 'react'
-import { getConfig, updateConfig, testConnection } from '../lib/api'
-import type { AppConfig } from '../lib/types'
+import { getConfig, updateConfig, testConnection, wxLogin, wxLoginStatus, wxLogout, wxSearch, wxSubscribe, wxAccounts, wxUnsubscribe } from '../lib/api'
+import type { AppConfig, WxLoginStatus as WxLoginStatusType, WxSearchResult, WxAccount } from '../lib/types'
 import { useToast } from './Toast'
 
 interface Provider {
@@ -91,6 +91,14 @@ export default function ConfigPage() {
   const [selectedProvider, setSelectedProvider] = useState<string>('deepseek')
   const { toast } = useToast()
 
+  // WeChat state
+  const [wxStatus, setWxStatus] = useState<WxLoginStatusType>({ status: 'idle', logged_in: false, error: '', qr_exists: false })
+  const [wxPolling, setWxPolling] = useState(false)
+  const [wxSearchKeyword, setWxSearchKeyword] = useState('')
+  const [wxSearchResults, setWxSearchResults] = useState<WxSearchResult[]>([])
+  const [wxSearching, setWxSearching] = useState(false)
+  const [wxSubscribed, setWxSubscribed] = useState<WxAccount[]>([])
+
   useEffect(() => {
     getConfig()
       .then(c => {
@@ -102,6 +110,10 @@ export default function ConfigPage() {
       })
       .catch(err => toast(err instanceof Error ? err.message : '加载失败', 'error'))
       .finally(() => setLoading(false))
+
+    // Load WeChat status and subscribed accounts
+    wxLoginStatus().then(setWxStatus).catch(() => {})
+    wxAccounts().then(setWxSubscribed).catch(() => {})
   }, [])
 
   const handleSave = async () => {
@@ -153,6 +165,88 @@ export default function ConfigPage() {
 
   const updateCrawl = (key: string, value: number) => {
     setConfig(prev => prev ? { ...prev, crawl: { ...prev.crawl, [key]: value } } : prev)
+  }
+
+  // WeChat handlers
+  const handleWxLogin = async () => {
+    try {
+      const result = await wxLogin()
+      setWxStatus(prev => ({ ...prev, status: result.status as WxLoginStatusType['status'] }))
+      // Start polling for status changes
+      setWxPolling(true)
+      const poll = async () => {
+        for (let i = 0; i < 120; i++) {
+          await new Promise(r => setTimeout(r, 2000))
+          try {
+            const status = await wxLoginStatus()
+            setWxStatus(status)
+            if (status.logged_in || status.status === 'error') {
+              setWxPolling(false)
+              if (status.logged_in) {
+                const accounts = await wxAccounts()
+                setWxSubscribed(accounts)
+              }
+              return
+            }
+          } catch { break }
+        }
+        setWxPolling(false)
+      }
+      poll()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '启动登录失败', 'error')
+    }
+  }
+
+  const handleWxLogout = async () => {
+    try {
+      await wxLogout()
+      setWxStatus({ status: 'idle', logged_in: false, error: '', qr_exists: false })
+      setWxSubscribed([])
+      setWxSearchResults([])
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '退出登录失败', 'error')
+    }
+  }
+
+  const handleWxSearch = async () => {
+    if (!wxSearchKeyword.trim()) return
+    setWxSearching(true)
+    try {
+      const result = await wxSearch(wxSearchKeyword.trim())
+      setWxSearchResults(result.accounts)
+      if (result.accounts.length === 0) toast('未找到公众号', 'error')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '搜索失败', 'error')
+    } finally {
+      setWxSearching(false)
+    }
+  }
+
+  const handleWxSubscribe = async (account: WxSearchResult) => {
+    try {
+      await wxSubscribe({
+        fakeid: account.fakeid,
+        nickname: account.nickname,
+        alias: account.alias,
+        avatar_url: account.round_head_img,
+      })
+      toast(`已订阅: ${account.nickname}`, 'success')
+      const accounts = await wxAccounts()
+      setWxSubscribed(accounts)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '订阅失败', 'error')
+    }
+  }
+
+  const handleWxUnsubscribe = async (fakeid: string) => {
+    try {
+      await wxUnsubscribe(fakeid)
+      setWxSubscribed(prev => prev.filter(a => a.id !== fakeid))
+      toast('已取消订阅', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '取消订阅失败', 'error')
+    }
   }
 
   if (loading || !config) return <div className="empty-state"><p>加载中...</p></div>
@@ -302,6 +396,124 @@ export default function ConfigPage() {
           <label>最大重试次数</label>
           <input type="number" min="0" max="10" value={config.crawl.max_retry}
             onChange={e => updateCrawl('max_retry', parseInt(e.target.value))} />
+        </div>
+      </div>
+
+      {/* WeChat MP Config */}
+      <div className="config-section">
+        <h3>微信公众号</h3>
+        <div style={{ padding: '12px 0' }}>
+          {!wxStatus.logged_in ? (
+            <div>
+              <p style={{ color: 'var(--text-muted)', marginBottom: 12, fontSize: 14 }}>
+                扫码登录微信公众号管理平台，即可搜索和订阅公众号、自动爬取文章。
+              </p>
+              <button className="btn btn-primary" onClick={handleWxLogin} disabled={wxPolling}>
+                {wxStatus.status === 'loading' ? '正在加载...' :
+                 wxStatus.status === 'qr_ready' ? '请扫码' :
+                 wxPolling ? <span className="spinner" /> : '登录微信公众号'}
+              </button>
+              {wxStatus.status === 'qr_ready' && (
+                <div style={{ marginTop: 16 }}>
+                  <img
+                    src={`/api/wx/qrcode?t=${Date.now()}`}
+                    alt="微信登录二维码"
+                    style={{ width: 200, height: 200, border: '1px solid var(--border)', borderRadius: 8 }}
+                  />
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+                    请使用微信扫描二维码登录（二维码约60秒过期）
+                  </p>
+                </div>
+              )}
+              {wxStatus.error && (
+                <p style={{ color: 'var(--danger)', marginTop: 8, fontSize: 13 }}>{wxStatus.error}</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <span style={{ color: 'var(--success)' }}>已登录</span>
+                <button className="btn" onClick={handleWxLogout} style={{ fontSize: 12, padding: '4px 12px' }}>退出登录</button>
+              </div>
+
+              {/* Search */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>搜索公众号</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={wxSearchKeyword}
+                    onChange={e => setWxSearchKeyword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleWxSearch()}
+                    placeholder="输入公众号名称"
+                    style={{ flex: 1 }}
+                  />
+                  <button className="btn" onClick={handleWxSearch} disabled={wxSearching}>
+                    {wxSearching ? <span className="spinner" /> : '搜索'}
+                  </button>
+                </div>
+                {wxSearchResults.length > 0 && (
+                  <div style={{ marginTop: 8, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    {wxSearchResults.map(r => (
+                      <div key={r.fakeid} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                        borderBottom: '1px solid var(--border)',
+                      }}>
+                        {r.round_head_img && (
+                          <img src={r.round_head_img} alt="" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500 }}>{r.nickname}</div>
+                          {r.alias && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.alias}</div>}
+                        </div>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleWxSubscribe(r)}
+                          disabled={wxSubscribed.some(a => a.id === r.fakeid)}
+                          style={{ fontSize: 12, padding: '4px 12px' }}
+                        >
+                          {wxSubscribed.some(a => a.id === r.fakeid) ? '已订阅' : '订阅'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Subscribed accounts */}
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>
+                  已订阅公众号 {wxSubscribed.length > 0 && `(${wxSubscribed.length})`}
+                </label>
+                {wxSubscribed.length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>暂无订阅，搜索公众号后点击"订阅"添加</p>
+                ) : (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    {wxSubscribed.map(a => (
+                      <div key={a.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                        borderBottom: '1px solid var(--border)',
+                      }}>
+                        {a.avatar_url && (
+                          <img src={a.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500 }}>{a.nickname}</div>
+                          {a.alias && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.alias}</div>}
+                        </div>
+                        <button
+                          className="btn"
+                          onClick={() => handleWxUnsubscribe(a.id)}
+                          style={{ fontSize: 12, padding: '4px 12px', color: 'var(--danger)' }}
+                        >
+                          取消订阅
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

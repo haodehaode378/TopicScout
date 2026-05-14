@@ -96,6 +96,7 @@ topic_scout/
 │   ├── weibo.py         # 微博（参考 MediaCrawler）
 │   ├── zhihu.py         # 知乎
 │   ├── xiaohongshu.py   # 小红书（参考 MediaCrawler）
+│   ├── wechat.py        # 微信公众号（调 we-mp-rss 微服务）
 │   └── base.py          # 爬虫基类（统一接口）
 ├── summarizer.py        # AI 全局总结 + 归类
 ├── exporter.py          # JSON / PDF 导出
@@ -166,6 +167,7 @@ tests/
 | 抖音 | JoeanAmier/TikTokDownloader | 14,394 |
 | B站下载 | nilaoda/BBDown | 13,866 |
 | B站异步 | HFrost0/bilix | 1,778 |
+| 微信公众号 | rachelos/we-mp-rss | - |
 
 ## LLM 配置
 

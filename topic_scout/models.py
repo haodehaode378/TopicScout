@@ -24,6 +24,7 @@ class Platform(str, Enum):
     WEIBO = "weibo"
     ZHIHU = "zhihu"
     XIAOHONGSHU = "xiaohongshu"
+    WECHAT = "wechat"
 
 
 class TaskType(str, Enum):
@@ -113,6 +114,17 @@ class Summary:
     key_insights: list[str] = field(default_factory=list)
     reliability: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass
+class WxAccount:
+    id: str  # fakeid
+    nickname: str = ""
+    alias: str = ""
+    avatar_url: str = ""
+    subscribed_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    last_crawl_at: str = ""
+    status: str = "active"
 
 
 def topic_to_dict(t: Topic) -> dict:

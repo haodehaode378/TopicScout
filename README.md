@@ -27,18 +27,51 @@ TopicScout 是一个**个人研究 Agent**。输入一个关键词，AI 通过�
 
 作为视频生成项目的前置数据源，也可独立用于任何主题的信息调研。
 
+## 截图预览
+
+### 首页 — 主题列表
+
+显示所有研究主题，支持搜索、状态筛选、一键删除。
+
+![首页](docs/screenshots/home.png)
+
+### AI 对话 — 追问细化
+
+聊天式交互，AI 自动追问直到理解清楚你的研究方向，支持跳过和回退。
+
+![AI 对话](docs/screenshots/chat.png)
+
+### 结果页 — Notion 式展示
+
+三栏布局：左侧分类筛选、中间来源卡片列表、右侧版本管理。支持实时编辑、标记有用、图片预览。
+
+![结果页](docs/screenshots/result.png)
+
+### 任务页 — 后台进度
+
+实时进度条 + SSE 推送，爬取状态一目了然。
+
+![任务页](docs/screenshots/tasks.png)
+
+### 配置页 — LLM + 爬取 + 微信公众号
+
+支持多种 LLM 服务商卡片式选择、爬取参数调节、微信公众号扫码登录订阅。
+
+![配置页](docs/screenshots/config.png)
+
 ## 功能特性
 
 | 功能 | 说明 |
 |------|------|
 | AI 对话 | 聊天式追问，自动判断何时理解清楚，支持跳过和回退 |
-| 多源爬取 | 通用网页、B站、抖音、微博、知乎、小红书 |
+| 多源爬取 | 通用网页、B站、抖音、微博、知乎、小红书、微信公众号 |
 | 智能总结 | 全局总结 + 关键洞察 + 信息可靠度评估 |
 | 自动归类 | AI 自动将来源归入 3-8 个类别 |
 | Notion 式展示 | 三栏布局：分类筛选 / 来源卡片 / 版本管理 |
 | 版本管理 | 每次爬取生成新版本，可切换查看历史版本 |
 | 实时进度 | SSE 推送爬取进度，进度条实时更新 |
 | 导出 | PDF（封面+目录+正文）/ JSON 结构化复用 |
+| 微信公众号 | 扫码登录 → 搜索订阅公众号 → 自动爬取文章 |
 | 深色/浅色 | CSS 变量主题切换，localStorage 持久化 |
 
 ## 快速开始
@@ -56,6 +89,7 @@ cd TopicScout
 
 # 后端
 pip install -e .
+playwright install chromium
 
 # 前端
 cd frontend
@@ -89,8 +123,8 @@ cd frontend && npm run dev
 | 后端 | Python 3.13 + FastAPI | 异步爬虫、轻量 API |
 | 前端 | React 18 + TypeScript + Vite | Notion 风格 UI |
 | 数据库 | SQLite + aiosqlite | 轻量存储，无需额外服务 |
-| LLM | OpenAI 兼容格式 | 支持 MiMo / DeepSeek / Kimi / MiniMax / 通义千问 |
-| 爬虫 | httpx + 正则解析 | 通用网页 + 国内平台 |
+| LLM | OpenAI 兼容格式 | 支持 DeepSeek / Kimi / MiniMax / 通义千问 / MiMo |
+| 爬虫 | httpx + Playwright | 通用网页 + 国内平台 + 微信公众号 |
 | PDF | WeasyPrint | HTML 直转 PDF |
 | 动画 | Framer Motion | 卡片展开、进度条、入场动画 |
 
@@ -103,6 +137,9 @@ topic_scout/
 ├── models.py            # 数据模型
 ├── llm.py               # LLM 适配器
 ├── chat.py              # AI 追问对话
+├── wx_auth.py           # 微信扫码登录（Playwright）
+├── wx_api.py            # 微信公众号 API 调用
+├── wx_token.py          # 凭证持久化
 ├── crawler/
 │   ├── base.py          # 爬虫基类
 │   ├── web.py           # 通用网页
@@ -110,7 +147,8 @@ topic_scout/
 │   ├── douyin.py        # 抖音
 │   ├── weibo.py         # 微博
 │   ├── zhihu.py         # 知乎
-│   └── xiaohongshu.py   # 小红书
+│   ├── xiaohongshu.py   # 小红书
+│   └── wechat.py        # 微信公众号
 ├── summarizer.py        # AI 总结 + 归类
 ├── exporter.py          # JSON / PDF 导出
 ├── server.py            # FastAPI 服务
@@ -167,6 +205,18 @@ frontend/src/
 | GET | `/api/topics/:id/export/json` | 导出 JSON |
 | POST | `/api/topics/:id/export/pdf` | 导出 PDF |
 
+### 微信公众号
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/wx/login` | 启动扫码登录 |
+| GET | `/api/wx/status` | 登录状态 |
+| GET | `/api/wx/qrcode` | QR 码图片 |
+| POST | `/api/wx/logout` | 退出登录 |
+| POST | `/api/wx/search` | 搜索公众号 |
+| POST | `/api/wx/subscribe` | 订阅公众号 |
+| GET | `/api/wx/accounts` | 已订阅列表 |
+| DELETE | `/api/wx/accounts/:fakeid` | 取消订阅 |
+
 ### 任务 & 配置
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -183,10 +233,21 @@ frontend/src/
 
 | 服务商 | base_url |
 |--------|----------|
-| 小米 MiMo | 查官方文档 |
-| DeepSeek | `https://api.deepseek.com/v1` |
+| DeepSeek | `https://api.deepseek.com` |
 | Kimi | `https://api.moonshot.cn/v1` |
+| MiniMax | `https://api.minimaxi.com/v1` |
 | 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| 小米 MiMo | `https://api.xiaomimimo.com/v1` |
+
+## 微信公众号集成
+
+TopicScout 内置微信公众号爬取能力：
+
+1. **扫码登录**：配置页点击"登录微信公众号"，用手机微信扫码
+2. **搜索订阅**：搜索公众号名称，一键订阅
+3. **自动爬取**：创建主题选择 wechat 平台，自动从已订阅公众号抓取文章
+
+技术方案：Playwright 无头浏览器模拟登录 → 获取 token + cookies → httpx 调用 MP 平台 API。
 
 ## 测试
 
@@ -208,6 +269,7 @@ cd frontend && npx vite build
 | [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) | 49k+ | 国内平台爬虫架构 |
 | [gpt-researcher](https://github.com/assafelovic/gpt-researcher) | 27k+ | planner+execution 架构 |
 | [crawl4ai](https://github.com/unclecode/crawl4ai) | 65k+ | LLM 友好的网页爬取 |
+| [we-mp-rss](https://github.com/rachelos/we-mp-rss) | — | 微信公众号爬取参考 |
 
 ## 贡献
 
