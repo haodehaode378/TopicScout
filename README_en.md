@@ -55,7 +55,7 @@ Real-time progress bars with SSE push notifications for crawl status at a glance
 
 ### Config — LLM + Crawling + WeChat
 
-Provider card selection, crawling parameter tuning, and WeChat public account QR login with subscription management.
+Provider card selection, crawling parameter tuning, and WeChat public account QR login.
 
 ![Config](docs/screenshots/config.png)
 
@@ -71,7 +71,7 @@ Provider card selection, crawling parameter tuning, and WeChat public account QR
 | Version Management | Each crawl creates a new version with history switching |
 | Real-time Progress | SSE push with animated progress bars |
 | Export | PDF (cover + TOC + body) / structured JSON for downstream reuse |
-| WeChat MP | QR login → search & subscribe accounts → auto crawl articles |
+| WeChat MP | QR login → keyword-based search → auto crawl articles |
 | Dark / Light Theme | CSS variable theming with localStorage persistence |
 
 ## Quick Start
@@ -133,8 +133,8 @@ Open http://localhost:3783 to start using.
 TopicScout has built-in WeChat MP crawling:
 
 1. **QR Login**: Click "Login WeChat MP" in config, scan QR with your phone
-2. **Search & Subscribe**: Search by account name, one-click subscribe
-3. **Auto Crawl**: Select wechat platform when creating a topic, auto-fetches articles from subscribed accounts
+2. **Keyword Search**: When creating a topic, AI automatically searches relevant public accounts based on keywords
+3. **Auto Crawl**: Fetches latest articles from found accounts, fully automatic like web/Bilibili platforms
 
 Technical approach: Playwright headless browser for login → token + cookies → httpx MP platform API calls.
 
